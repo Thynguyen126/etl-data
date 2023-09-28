@@ -1,5 +1,4 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import explode, split
 
 spark = SparkSession \
     .builder \
@@ -12,24 +11,24 @@ spark = SparkSession \
 df = spark \
   .readStream \
   .format("kafka") \
-  .option("kafka.bootstrap.servers", "kafka:9092") \
-  .option("subscribe", "demo") \
+  .option("kafka.bootstrap.servers", "localhost:9092") \
+  .option("subscribe", "orders") \
   .load()
 
 df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
 
 # Split the lines into words
-words = df.select(
-   explode(
-       split(df.value, " ")
-   ).alias("word")
-)
+# words = df.select(
+#    explode(
+#        split(df.value, " ")
+#    ).alias("word")
+# )
 
 # Generate running word count
-wordCounts = words.groupBy("word").count()
+# wordCounts = words.groupBy("word").count()
 
  # Start running the query that prints the running counts to the console
-query = wordCounts \
+query = df \
     .writeStream \
     .outputMode("update") \
     .format("console") \

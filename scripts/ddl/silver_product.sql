@@ -4,8 +4,8 @@ CREATE TABLE products (
     title text,
     category text,
     vender text,
-    price double,
-    rating smallint,
+    price double precision,
+    rating double precision,
     created_at timestamp
 );
-\copy users FROM '/tmp/data/products.csv' DELIMITER ',' CSV HEADER;
+\copy products FROM '/tmp/data/products.csv' DELIMITER ',' CSV HEADER;
