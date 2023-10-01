@@ -1,27 +1,42 @@
 from pyspark.sql import SparkSession
+import pyspark.sql.functions as sf
+from pyspark.sql.types import * 
 
-scala_version = '2.12'
-spark_version = '3.3.0'
 
-packages = [
-    f'org.apache.spark:spark-sql-kafka-0-10_{scala_version}:{spark_version}',
-    'org.apache.kafka:kafka-clients:3.2.3'
-]
 spark = SparkSession.builder \
    .appName("streaming_to_bronze") \
    .config("spark.driver.host", "localhost") \
-   .config("spark.jars.packages", ",".join(packages)) \
    .getOrCreate()
+
+spark.sparkContext.setLogLevel("WARN")
+
+
 
 # Create DataFrame representing the stream of input lines from kafka
 df = spark \
   .readStream \
   .format("kafka") \
-  .option("kafka.bootstrap.servers", "localhost:9093") \
+  .option("kafka.bootstrap.servers", "kafka:9092") \
   .option("subscribe", "orders") \
   .load()
 
-df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+order_schema = StructType([
+  StructField("order_code", IntegerType(), False),
+  StructField("distance", FloatType(), True),
+  StructField("final_deli_supplier", StringType(), True),
+  StructField("destination_region", StringType(), True),
+  StructField("destination_district", StringType(), True),
+  StructField("departure_region", StringType(), True),
+  StructField("seller_id", IntegerType(), False),
+  StructField("route", StringType(), True),
+  StructField("product_id", IntegerType(), False),
+  StructField("created_at", TimestampType(), True)
+])
+
+df2 = df.selectExpr("CAST(value AS STRING)") \
+  .withColumn("value_json", sf.from_json(sf.col("value").cast("string"), order_schema)) \
+  .select("value_json.*")
+
 
 # Split the lines into words
 # words = df.select(
@@ -33,11 +48,23 @@ df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
 # Generate running word count
 # wordCounts = words.groupBy("word").count()
 
+
+def _write_streaming(df, epoch_id) -> None:         
+
+    df.write \
+        .mode('append') \
+        .format("jdbc") \
+        .option("url", f"jdbc:postgresql://postgres:5432/db_bronze_zone") \
+        .option("driver", "org.postgresql.Driver") \
+        .option("dbtable", 'orders') \
+        .option("user", 'postgres') \
+        .option("password", 'admin@123') \
+        .save()
+
  # Start running the query that prints the running counts to the console
-query = df \
+query = df2 \
     .writeStream \
-    .outputMode("update") \
-    .format("console") \
+    .foreachBatch(_write_streaming) \
     .start()
 
 query.awaitTermination()

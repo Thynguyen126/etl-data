@@ -13,6 +13,9 @@ services:
     container_name: spark_master
     hostname: spark_master
     user: root
+    volumes:
+      - ./scripts:/dev/scripts
+      - ./jars:/opt/jars
     environment:
       - SPARK_MODE=master
       - SPARK_LOCAL_IP=spark_master
@@ -23,6 +26,7 @@ services:
     ports:
       - '8080:8080'
       - '4040:4040'
+      - '7077:7077'
     networks:
       - datapipeline
 
